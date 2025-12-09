@@ -1,0 +1,254 @@
+*&---------------------------------------------------------------------*
+*&  Include           Z129_PROJECT_PROGRAM_I01
+*&---------------------------------------------------------------------*
+
+MODULE user_command_0100 INPUT.
+
+  CASE ok_code.
+    WHEN 'BACK' OR 'CANCEL' OR 'EXIT'.
+      " Exit the program completely
+      SET SCREEN 0.
+      LEAVE SCREEN.
+    WHEN 'MAINTAIN_MACHINE_DAT'.
+*      CALL SCREEN 0110.
+       CALL TRANSACTION 'Z129_MACHINE'.
+    WHEN 'MAINTAIN_PRODUCT_DAT'.  " Truncated from MAINTAIN_PRODUCT_DATA
+      " Navigate to Product Maintenance screen
+*      CALL SCREEN 0120.
+      CALL TRANSACTION 'Z129_VEND_PROD'.
+    WHEN 'MAINTAIN_STUDENT_DAT'.  " Truncated from MAINTAIN_STUDENT_DATA
+      " Navigate to Student Maintenance screen
+*      CALL SCREEN 0130.
+      CALL TRANSACTION 'Z129_STUDENT'.
+    WHEN 'UPDATE_STOCK_LEVEL'.    " 18 chars - OK
+      " Navigate to Stock Update screen
+      CALL SCREEN 0140.
+*      CALL TRANSACTION 'Z129_STOCK'.
+
+    WHEN 'LOG_STUDENT_USAGE'.     " 18 chars - OK
+      " Navigate to Usage Logging screen
+      CALL SCREEN 0150.
+
+    WHEN 'REFILL_REPORT'.         " 14 chars - OK
+      " Navigate to Refill Report screen
+      CALL SCREEN 0160.
+
+    WHEN 'STOCK_OVERVIEW'.        " 14 chars - OK
+      " Navigate to Stock Overview screen
+      CALL SCREEN 0170.
+  ENDCASE.
+
+  CLEAR ok_code.
+
+ENDMODULE.
+
+MODULE user_command_0110 INPUT.
+
+  CASE ok_code.
+    WHEN 'BACK' OR 'CANCEL'.
+      " Go back to Main Menu (screen 0100)
+      LEAVE TO SCREEN 0100.
+
+    WHEN 'EXIT'.
+      " Exit the program completely
+      SET SCREEN 0.
+      LEAVE SCREEN.
+
+  ENDCASE.
+
+  CLEAR ok_code.
+
+ENDMODULE.
+
+MODULE user_command_0120 INPUT.
+  CASE ok_code.
+    WHEN 'BACK' OR 'CANCEL'.
+      LEAVE TO SCREEN 0100.
+
+    WHEN 'EXIT'.
+      SET SCREEN 0.
+      LEAVE SCREEN.
+
+  ENDCASE.
+
+  CLEAR ok_code.
+ENDMODULE.
+
+MODULE user_command_0130 INPUT.
+  CASE ok_code.
+    WHEN 'BACK' OR 'CANCEL'.
+      LEAVE TO SCREEN 0100.
+
+    WHEN 'EXIT'.
+      SET SCREEN 0.
+      LEAVE SCREEN.
+
+  ENDCASE.
+
+  CLEAR ok_code.
+ENDMODULE.
+
+
+MODULE user_command_0140 INPUT.
+  CASE ok_code.
+    WHEN 'REFRESH'.
+      PERFORM refresh_stock_data.
+    WHEN 'BACK' OR 'CANCEL'.
+      LEAVE TO SCREEN 0100.
+    WHEN 'ADD_STOCK'.  " # Match your button exactly
+      PERFORM add_stock_popup.
+      PERFORM refresh_stock_data.
+    WHEN 'EXIT'.
+      PERFORM free_alv_objects.
+      SET SCREEN 0.
+      LEAVE SCREEN.
+
+  ENDCASE.
+
+  CLEAR ok_code.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module USER_COMMAND_0150 INPUT - Usage Logging Navigation
+*&---------------------------------------------------------------------*
+MODULE user_command_0150 INPUT.
+  CASE ok_code.
+
+    WHEN 'LOG_USAGE'.
+      PERFORM log_student_usage.
+
+    WHEN 'CLEAR'.
+      PERFORM clear_usage_fields.
+      " Important: Don't leave screen, just refresh
+
+    WHEN 'BACK' OR 'CANCEL'.
+      PERFORM clear_usage_fields.
+      LEAVE TO SCREEN 0100.
+
+    WHEN 'EXIT'.
+      SET SCREEN 0.
+      LEAVE SCREEN.
+
+  ENDCASE.
+
+  CLEAR ok_code.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module USER_COMMAND_0160 INPUT - Refill Report Navigation
+*&---------------------------------------------------------------------*
+MODULE user_command_0160 INPUT.
+  CASE ok_code.
+*    WHEN 'BACK' OR 'CANCEL'.
+*      LEAVE TO SCREEN 0100.
+*
+*    WHEN 'EXIT'.
+*      SET SCREEN 0.
+*      LEAVE SCREEN.
+
+    WHEN 'REFRESH'.
+      " Refresh the report
+      PERFORM refresh_refill_report.
+
+    WHEN 'BACK' OR 'CANCEL'.
+      " Free ALV objects before leaving
+      PERFORM free_refill_alv_objects.
+      LEAVE TO SCREEN 0100.
+
+    WHEN 'EXIT'.
+      " Free ALV objects before exiting
+      PERFORM free_refill_alv_objects.
+      SET SCREEN 0.
+      LEAVE SCREEN.
+
+  ENDCASE.
+
+  CLEAR ok_code.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module USER_COMMAND_0170 INPUT - Stock Overview Navigation
+*&---------------------------------------------------------------------*
+MODULE user_command_0170 INPUT.
+  CASE ok_code.
+
+    WHEN 'SHOW_STOCK'.
+      PERFORM display_machine_stock_overview.
+
+    WHEN 'REFRESH'.
+      PERFORM refresh_machine_stock_overview.
+
+    WHEN 'CLEAR'.
+      PERFORM clear_overview_screen.
+
+    WHEN 'BACK' OR 'CANCEL'.
+      PERFORM free_overview_alv_objects.
+      CLEAR: gv_overview_machine_id, gv_overview_location.
+      LEAVE TO SCREEN 0100.
+
+    WHEN 'EXIT'.
+      PERFORM free_overview_alv_objects.
+      SET SCREEN 0.
+      LEAVE SCREEN.
+
+  ENDCASE.
+
+  CLEAR ok_code.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module GET_OVERVIEW_MACHINE_INFO INPUT
+*&---------------------------------------------------------------------*
+MODULE get_overview_machine_info INPUT.
+  PERFORM fetch_overview_machine_info.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module F4_OVERVIEW_MACHINE INPUT
+*&---------------------------------------------------------------------*
+MODULE f4_overview_machine INPUT.
+  PERFORM f4_help_overview_machine.
+ENDMODULE.
+
+
+*&---------------------------------------------------------------------*
+*& Module GET_STUDENT_INFO INPUT - Auto-fill student details
+*&---------------------------------------------------------------------*
+MODULE get_student_info INPUT.
+  PERFORM fetch_student_info.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module GET_MACHINE_INFO INPUT - Auto-fill machine details
+*&---------------------------------------------------------------------*
+MODULE get_machine_info INPUT.
+  PERFORM fetch_machine_info.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module GET_PRODUCT_INFO INPUT - Auto-fill product details and stock
+*&---------------------------------------------------------------------*
+MODULE get_product_info INPUT.
+  PERFORM fetch_product_info.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module F4_USAGE_STUDENT INPUT - F4 help for Student ID
+*&---------------------------------------------------------------------*
+MODULE f4_usage_student INPUT.
+  PERFORM f4_help_student_usage.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module F4_USAGE_MACHINE INPUT - F4 help for Machine ID
+*&---------------------------------------------------------------------*
+MODULE f4_usage_machine INPUT.
+  PERFORM f4_help_machine_usage.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module F4_USAGE_PRODUCT INPUT - F4 help for Product ID
+*&---------------------------------------------------------------------*
+MODULE f4_usage_product INPUT.
+  PERFORM f4_help_product_usage.
+ENDMODULE.

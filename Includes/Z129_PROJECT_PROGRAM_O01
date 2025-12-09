@@ -1,0 +1,81 @@
+*&---------------------------------------------------------------------*
+*&  Include           Z129_PROJECT_PROGRAM_O01
+*&---------------------------------------------------------------------*
+
+MODULE status_0100 OUTPUT.
+  SET PF-STATUS 'ZSTATUS'.
+  SET TITLEBAR 'ZTITLE'.
+ENDMODULE.
+
+MODULE status_0110 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_0110'.
+  SET TITLEBAR 'ZTITLE_0110'.
+ENDMODULE.
+
+MODULE status_0120 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_0120'.
+  SET TITLEBAR 'ZTITLE_0120'.
+ENDMODULE.
+
+MODULE status_0130 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_0130'.
+  SET TITLEBAR 'ZTITLE_0130'.
+ENDMODULE.
+
+MODULE status_0140 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_0140'.
+  SET TITLEBAR 'ZTITLE_0140'.
+  IF go_alv_grid IS INITIAL.
+    PERFORM display_stock_alv.
+  ELSE.
+    PERFORM refresh_stock_data.
+  ENDIF.
+ENDMODULE.
+
+MODULE status_0150 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_0150'.
+  SET TITLEBAR 'ZTITLE_0150'.
+
+  " Initialize default values
+  IF gv_usage_qty IS INITIAL.
+    gv_usage_qty = 1.
+  ENDIF.
+
+  " Display any messages
+  IF gv_usage_message IS NOT INITIAL.
+    MESSAGE gv_usage_message TYPE 'I' DISPLAY LIKE 'S'.
+    CLEAR gv_usage_message.
+  ENDIF.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module STATUS_0160 OUTPUT
+*&---------------------------------------------------------------------*
+MODULE status_0160 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_0160'.
+  SET TITLEBAR 'ZTITLE_0160'.
+
+  " Display Refill Report ALV
+  IF go_refill_grid IS INITIAL.
+    PERFORM display_refill_report.
+  ELSE.
+    PERFORM refresh_refill_report.
+  ENDIF.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*& Module STATUS_0170 OUTPUT
+*&---------------------------------------------------------------------*
+MODULE status_0170 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_0170'.
+  SET TITLEBAR 'ZTITLE_0170'.
+  " Only display ALV if machine ID is entered
+  IF gv_overview_machine_id IS NOT INITIAL.
+    IF go_overview_grid IS INITIAL.
+      PERFORM display_machine_stock_overview.
+    ELSE.
+      PERFORM refresh_machine_stock_overview.
+    ENDIF.
+  ENDIF.
+
+ENDMODULE.

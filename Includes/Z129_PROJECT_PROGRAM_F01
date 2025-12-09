@@ -1,0 +1,1703 @@
+*&---------------------------------------------------------------------*
+*&  Include           Z129_PROJECT_PROGRAM_F01
+*&  FORM Routines for Vending Machine Inventory System
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*& Form DISPLAY_STOCK_ALV
+*&---------------------------------------------------------------------*
+* Create and display ALV Grid with stock data
+*----------------------------------------------------------------------*
+FORM display_stock_alv.
+
+  " Get stock data
+  PERFORM get_stock_data.
+
+  " Create container
+  CREATE OBJECT go_container
+    EXPORTING
+      container_name = 'STOCK_CONTAINER'
+    EXCEPTIONS
+      OTHERS         = 1.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error creating container' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Create ALV Grid
+  CREATE OBJECT go_alv_grid
+    EXPORTING
+      i_parent = go_container
+    EXCEPTIONS
+      OTHERS   = 1.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error creating ALV Grid' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Build field catalog
+  PERFORM build_fieldcat.
+
+  " Set layout
+  PERFORM set_layout.
+
+  " Display ALV
+  CALL METHOD go_alv_grid->set_table_for_first_display
+    EXPORTING
+      is_layout       = gs_layout
+    CHANGING
+      it_outtab       = gt_stock_display
+      it_fieldcatalog = gt_fieldcat
+    EXCEPTIONS
+      OTHERS          = 1.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error displaying ALV' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form GET_STOCK_DATA
+*&---------------------------------------------------------------------*
+* Fetch stock data with machine and product details
+*----------------------------------------------------------------------*
+FORM get_stock_data.
+
+  CLEAR: gt_stock_display.
+
+  " Join stock with machine and product tables
+  SELECT s~machine_id,
+         s~product_id,
+         s~current_qty,
+*         m~location,
+         p~product_name,
+         p~max_capacity
+    FROM z129_stock AS s
+    INNER JOIN z129_machine AS m
+      ON s~machine_id = m~machine_id
+    INNER JOIN z129_vend_prod AS p
+      ON s~product_id = p~product_id
+    INTO TABLE @DATA(lt_stock_data).
+
+  IF sy-subrc = 0.
+
+    " Calculate stock percentage
+    LOOP AT lt_stock_data INTO DATA(ls_data).
+
+      gs_stock_display-machine_id  = ls_data-machine_id.
+      gs_stock_display-product_id  = ls_data-product_id.
+      gs_stock_display-current_qty = ls_data-current_qty.
+*      gs_stock_display-location    = ls_data-location.
+      gs_stock_display-product_name = ls_data-product_name.
+      gs_stock_display-max_capacity = ls_data-max_capacity.
+
+      " Calculate percentage
+      IF ls_data-max_capacity > 0.
+        gs_stock_display-stock_pct =
+          ( ls_data-current_qty / ls_data-max_capacity ) * 100.
+      ELSE.
+        gs_stock_display-stock_pct = 0.
+      ENDIF.
+
+      APPEND gs_stock_display TO gt_stock_display.
+      CLEAR gs_stock_display.
+
+    ENDLOOP.
+
+  ELSE.
+    MESSAGE 'No stock data found' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form BUILD_FIELDCAT
+*&---------------------------------------------------------------------*
+* Build field catalog for ALV
+*----------------------------------------------------------------------*
+FORM build_fieldcat.
+
+  CLEAR: gt_fieldcat.
+
+  " Machine ID
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'MACHINE_ID'.
+  gs_fieldcat-scrtext_l = 'Machine ID'.
+  gs_fieldcat-scrtext_m = 'Machine ID'.
+  gs_fieldcat-scrtext_s = 'Mach ID'.
+  gs_fieldcat-col_pos   = 1.
+  gs_fieldcat-outputlen = 10.
+  gs_fieldcat-key       = 'X'.
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  " Location
+*  CLEAR gs_fieldcat.
+*  gs_fieldcat-fieldname = 'LOCATION'.
+*  gs_fieldcat-scrtext_l = 'Location'.
+*  gs_fieldcat-scrtext_m = 'Location'.
+*  gs_fieldcat-scrtext_s = 'Location'.
+*  gs_fieldcat-col_pos   = 2.
+*  gs_fieldcat-outputlen = 30.
+*  APPEND gs_fieldcat TO gt_fieldcat.
+
+  " Product ID
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'PRODUCT_ID'.
+  gs_fieldcat-scrtext_l = 'Product ID'.
+  gs_fieldcat-scrtext_m = 'Product ID'.
+  gs_fieldcat-scrtext_s = 'Prod ID'.
+  gs_fieldcat-col_pos   = 3.
+  gs_fieldcat-outputlen = 10.
+  gs_fieldcat-key       = 'X'.
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  " Product Name
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'PRODUCT_NAME'.
+  gs_fieldcat-scrtext_l = 'Product Name'.
+  gs_fieldcat-scrtext_m = 'Product Name'.
+  gs_fieldcat-scrtext_s = 'Product'.
+  gs_fieldcat-col_pos   = 4.
+  gs_fieldcat-outputlen = 30.
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  " Current Quantity
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'CURRENT_QTY'.
+  gs_fieldcat-scrtext_l = 'Current Quantity'.
+  gs_fieldcat-scrtext_m = 'Current Qty'.
+  gs_fieldcat-scrtext_s = 'Curr Qty'.
+  gs_fieldcat-col_pos   = 5.
+  gs_fieldcat-outputlen = 10.
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  " Max Capacity
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'MAX_CAPACITY'.
+  gs_fieldcat-scrtext_l = 'Maximum Capacity'.
+  gs_fieldcat-scrtext_m = 'Max Capacity'.
+  gs_fieldcat-scrtext_s = 'Max Cap'.
+  gs_fieldcat-col_pos   = 6.
+  gs_fieldcat-outputlen = 10.
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  " Stock Percentage
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'STOCK_PCT'.
+  gs_fieldcat-scrtext_l = 'Stock %'.
+  gs_fieldcat-scrtext_m = 'Stock %'.
+  gs_fieldcat-scrtext_s = 'Stock %'.
+  gs_fieldcat-col_pos   = 7.
+  gs_fieldcat-outputlen = 8.
+  gs_fieldcat-do_sum    = ''.
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form SET_LAYOUT
+*&---------------------------------------------------------------------*
+* Set ALV layout options
+*----------------------------------------------------------------------*
+FORM set_layout.
+
+  CLEAR gs_layout.
+
+  gs_layout-zebra      = 'X'.        " Alternating row colors
+  gs_layout-cwidth_opt = 'X'.        " Optimize column width
+  gs_layout-sel_mode   = 'A'.        " Row selection mode
+  gs_layout-grid_title = 'Stock Overview - All Machines'. " Title
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form REFRESH_STOCK_DATA
+*&---------------------------------------------------------------------*
+* Refresh ALV data
+*----------------------------------------------------------------------*
+FORM refresh_stock_data.
+
+  " Get fresh data
+  PERFORM get_stock_data.
+
+  " Refresh ALV display
+  IF go_alv_grid IS NOT INITIAL.
+
+    DATA: ls_stable TYPE lvc_s_stbl.
+    ls_stable-row = 'X'.
+    ls_stable-col = 'X'.
+
+    CALL METHOD go_alv_grid->refresh_table_display
+      EXPORTING
+        is_stable = ls_stable
+      EXCEPTIONS
+        OTHERS    = 1.
+
+    IF sy-subrc = 0.
+      MESSAGE 'Data refreshed' TYPE 'S'.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form FREE_ALV_OBJECTS
+*&---------------------------------------------------------------------*
+* Free ALV objects before leaving screen
+*----------------------------------------------------------------------*
+FORM free_alv_objects.
+
+  IF go_alv_grid IS NOT INITIAL.
+    CALL METHOD go_alv_grid->free
+      EXCEPTIONS
+        OTHERS = 1.
+    FREE go_alv_grid.
+  ENDIF.
+
+  IF go_container IS NOT INITIAL.
+    CALL METHOD go_container->free
+      EXCEPTIONS
+        OTHERS = 1.
+    FREE go_container.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& END OF FORM ROUTINES
+*&---------------------------------------------------------------------*
+
+FORM add_stock_popup.
+
+  DATA: lv_answer TYPE c LENGTH 1,
+        lt_fields TYPE TABLE OF sval,
+        ls_field  TYPE sval.
+
+  " Clear input variables
+  CLEAR: gv_machine_id, gv_product_id, gv_qty, gv_error_flag.
+  CLEAR: lt_fields.
+
+  " Field 1: Machine ID
+  CLEAR ls_field.
+  ls_field-tabname    = 'Z129_STOCK'.
+  ls_field-fieldname  = 'MACHINE_ID'.
+  ls_field-value      = gv_machine_id.
+  ls_field-field_obl  = 'X'.
+  APPEND ls_field TO lt_fields.
+
+  " Field 2: Product ID
+  CLEAR ls_field.
+  ls_field-tabname    = 'Z129_STOCK'.
+  ls_field-fieldname  = 'PRODUCT_ID'.
+  ls_field-value      = gv_product_id.
+  ls_field-field_obl  = 'X'.
+  APPEND ls_field TO lt_fields.
+
+  " Field 3: Current Quantity
+  CLEAR ls_field.
+  ls_field-tabname    = 'Z129_STOCK'.
+  ls_field-fieldname  = 'CURRENT_QTY'.
+  ls_field-value      = gv_qty.
+  ls_field-field_obl  = 'X'.
+  APPEND ls_field TO lt_fields.
+
+  " Call popup
+  CALL FUNCTION 'POPUP_GET_VALUES'
+    EXPORTING
+      popup_title  = 'Add Stock Entry'
+      start_column = '10'
+      start_row    = '5'
+    IMPORTING
+      returncode   = lv_answer
+    TABLES
+      fields       = lt_fields
+    EXCEPTIONS
+      OTHERS       = 1.
+
+  " If user clicked OK (returncode = space means OK)
+  IF lv_answer = space.
+
+    " Read values back from table
+    READ TABLE lt_fields INTO ls_field INDEX 1.
+    IF sy-subrc = 0.
+      gv_machine_id = ls_field-value.
+    ENDIF.
+
+    READ TABLE lt_fields INTO ls_field INDEX 2.
+    IF sy-subrc = 0.
+      gv_product_id = ls_field-value.
+    ENDIF.
+
+    READ TABLE lt_fields INTO ls_field INDEX 3.
+    IF sy-subrc = 0.
+      gv_qty = ls_field-value.
+    ENDIF.
+
+    " Validate and save
+    PERFORM validate_and_save_stock.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form VALIDATE_AND_SAVE_STOCK
+*&---------------------------------------------------------------------*
+FORM validate_and_save_stock.
+
+  DATA: ls_stock   TYPE z129_stock,
+        lv_exists  TYPE c LENGTH 1,
+        lv_max_cap TYPE z129_vend_prod-max_capacity,
+        lv_msg     TYPE string.
+
+  CLEAR gv_error_flag.
+
+  " Validation 1: Check if Machine exists
+  SELECT SINGLE @abap_true
+    FROM z129_machine
+    INTO @lv_exists
+    WHERE machine_id = @gv_machine_id.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Machine ID does not exist. Please create machine first.' TYPE 'E'.
+    gv_error_flag = 'X'.
+    RETURN.
+  ENDIF.
+
+  " Validation 2: Check if Product exists and get max capacity
+  SELECT SINGLE max_capacity
+    FROM z129_vend_prod
+    INTO @lv_max_cap
+    WHERE product_id = @gv_product_id.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Product ID does not exist. Please create product first.' TYPE 'E'.
+    gv_error_flag = 'X'.
+    RETURN.
+  ENDIF.
+
+  " Validation 3: Check quantity is positive
+  IF gv_qty < 0.
+    MESSAGE 'Quantity cannot be negative' TYPE 'E'.
+    gv_error_flag = 'X'.
+    RETURN.
+  ENDIF.
+
+  " Validation 4: Check quantity doesn't exceed max capacity
+  IF gv_qty > lv_max_cap.
+    CONCATENATE 'Quantity (' gv_qty ') exceeds max capacity ('
+                lv_max_cap ')'
+                INTO lv_msg SEPARATED BY space.
+    MESSAGE lv_msg TYPE 'E'.
+    gv_error_flag = 'X'.
+    RETURN.
+  ENDIF.
+
+  " Validation 5: Check if stock entry already exists
+  SELECT SINGLE @abap_true
+    FROM z129_stock
+    INTO @lv_exists
+    WHERE machine_id = @gv_machine_id
+      AND product_id = @gv_product_id.
+
+  IF sy-subrc = 0.
+    " Stock exists - update it
+    UPDATE z129_stock
+      SET current_qty = @gv_qty
+      WHERE machine_id = @gv_machine_id
+        AND product_id = @gv_product_id.
+
+    IF sy-subrc = 0.
+      COMMIT WORK.
+      MESSAGE 'Stock updated successfully' TYPE 'S'.
+    ELSE.
+      ROLLBACK WORK.
+      MESSAGE 'Error updating stock' TYPE 'E'.
+      gv_error_flag = 'X'.
+    ENDIF.
+
+  ELSE.
+    " Stock doesn't exist - insert new
+    ls_stock-mandt       = sy-mandt.  " # Add this
+    ls_stock-machine_id  = gv_machine_id.
+    ls_stock-product_id  = gv_product_id.
+    ls_stock-current_qty = gv_qty.
+
+    INSERT z129_stock FROM ls_stock.
+
+    IF sy-subrc = 0.
+      COMMIT WORK.
+      MESSAGE 'Stock added successfully' TYPE 'S'.
+    ELSE.
+      ROLLBACK WORK.
+      " Try update instead (in case SELECT didn't find it but it exists)
+      UPDATE z129_stock
+        SET current_qty = gv_qty
+        WHERE machine_id = gv_machine_id
+          AND product_id = gv_product_id.
+
+      IF sy-subrc = 0.
+        COMMIT WORK.
+        MESSAGE 'Stock updated successfully' TYPE 'S'.
+      ELSE.
+        MESSAGE 'Error adding/updating stock' TYPE 'E'.
+        gv_error_flag = 'X'.
+      ENDIF.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& ALTERNATIVE: Even Simpler Version (If above still has issues)
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*& Form ADD_STOCK_POPUP_SIMPLE
+*&---------------------------------------------------------------------*
+* Simplest possible version - no modern syntax
+*----------------------------------------------------------------------*
+FORM add_stock_popup_simple.
+
+  DATA: lv_answer TYPE c LENGTH 1.
+  DATA: BEGIN OF lt_fields OCCURS 0.
+          INCLUDE STRUCTURE sval.
+  DATA: END OF lt_fields.
+
+  " Clear input variables
+  CLEAR: gv_machine_id, gv_product_id, gv_qty, gv_error_flag.
+  REFRESH lt_fields.
+
+  " Field 1: Machine ID
+  lt_fields-tabname    = 'Z129_STOCK'.
+  lt_fields-fieldname  = 'MACHINE_ID'.
+  lt_fields-value      = gv_machine_id.
+  lt_fields-field_obl  = 'X'.
+  APPEND lt_fields.
+
+  " Field 2: Product ID
+  lt_fields-tabname    = 'Z129_STOCK'.
+  lt_fields-fieldname  = 'PRODUCT_ID'.
+  lt_fields-value      = gv_product_id.
+  lt_fields-field_obl  = 'X'.
+  APPEND lt_fields.
+
+  " Field 3: Current Quantity
+  lt_fields-tabname    = 'Z129_STOCK'.
+  lt_fields-fieldname  = 'CURRENT_QTY'.
+  lt_fields-value      = gv_qty.
+  lt_fields-field_obl  = 'X'.
+  APPEND lt_fields.
+
+  " Call popup
+  CALL FUNCTION 'POPUP_GET_VALUES'
+    EXPORTING
+      popup_title  = 'Add Stock Entry'
+      start_column = '10'
+      start_row    = '5'
+    IMPORTING
+      returncode   = lv_answer
+    TABLES
+      fields       = lt_fields
+    EXCEPTIONS
+      OTHERS       = 1.
+
+  " If user clicked OK
+  IF lv_answer = space.
+
+    " Read values back
+    READ TABLE lt_fields INDEX 1.
+    IF sy-subrc = 0.
+      gv_machine_id = lt_fields-value.
+    ENDIF.
+
+    READ TABLE lt_fields INDEX 2.
+    IF sy-subrc = 0.
+      gv_product_id = lt_fields-value.
+    ENDIF.
+
+    READ TABLE lt_fields INDEX 3.
+    IF sy-subrc = 0.
+      gv_qty = lt_fields-value.
+    ENDIF.
+
+    " Validate and save
+    PERFORM validate_and_save_stock.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& END OF ADD STOCK POPUP CODE
+*&---------------------------------------------------------------------*
+
+
+*&---------------------------------------------------------------------*
+*& Form DISPLAY_REFILL_REPORT
+*&---------------------------------------------------------------------*
+* Create and display refill report ALV
+*----------------------------------------------------------------------*
+FORM display_refill_report.
+
+  " Get refill report data
+  PERFORM get_refill_report_data.
+
+  " Create container
+  CREATE OBJECT go_refill_container
+    EXPORTING
+      container_name = 'REFILL_CONTAINER'
+    EXCEPTIONS
+      OTHERS         = 1.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error creating refill container' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Create ALV Grid
+  CREATE OBJECT go_refill_grid
+    EXPORTING
+      i_parent = go_refill_container
+    EXCEPTIONS
+      OTHERS   = 1.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error creating refill ALV Grid' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Build field catalog
+  PERFORM build_refill_fieldcat.
+
+  " Set layout
+  PERFORM set_refill_layout.
+
+  " Display ALV
+  CALL METHOD go_refill_grid->set_table_for_first_display
+    EXPORTING
+      is_layout       = gs_refill_layout
+    CHANGING
+      it_outtab       = gt_refill_report
+      it_fieldcatalog = gt_refill_fieldcat
+    EXCEPTIONS
+      OTHERS          = 1.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error displaying refill ALV' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form GET_REFILL_REPORT_DATA
+*&---------------------------------------------------------------------*
+* Fetch and calculate refill requirements
+*----------------------------------------------------------------------*
+FORM get_refill_report_data.
+
+  CLEAR: gt_refill_report.
+
+  " Join stock with machine and product tables
+  SELECT s~machine_id,
+*         m~location,
+*         m~building_code,
+         s~product_id,
+         p~product_name,
+         s~current_qty,
+         p~max_capacity
+    FROM z129_stock AS s
+    INNER JOIN z129_machine AS m
+      ON s~machine_id = m~machine_id
+    INNER JOIN z129_vend_prod AS p
+      ON s~product_id = p~product_id
+    INTO TABLE @DATA(lt_data).
+
+  IF sy-subrc = 0.
+
+    " Calculate refill requirements
+    LOOP AT lt_data INTO DATA(ls_data).
+
+      CLEAR gs_refill_report.
+
+      gs_refill_report-machine_id    = ls_data-machine_id.
+*      gs_refill_report-location      = ls_data-location.
+*      gs_refill_report-building_code = ls_data-building_code.
+      gs_refill_report-product_id    = ls_data-product_id.
+      gs_refill_report-product_name  = ls_data-product_name.
+      gs_refill_report-current_qty   = ls_data-current_qty.
+      gs_refill_report-max_capacity  = ls_data-max_capacity.
+
+      " Calculate required quantity
+      gs_refill_report-required_qty =
+        ls_data-max_capacity - ls_data-current_qty.
+
+      " Calculate stock percentage
+      IF ls_data-max_capacity > 0.
+        gs_refill_report-stock_pct =
+          ( ls_data-current_qty / ls_data-max_capacity ) * 100.
+      ELSE.
+        gs_refill_report-stock_pct = 0.
+      ENDIF.
+
+      " Determine priority and color
+      IF gs_refill_report-stock_pct = 0.
+        gs_refill_report-priority = 'URGENT'.
+        gs_refill_report-line_color = 'C610'.  " Red
+      ELSEIF gs_refill_report-stock_pct < 30.
+        gs_refill_report-priority = 'HIGH'.
+        gs_refill_report-line_color = 'C310'.  " Yellow
+      ELSEIF gs_refill_report-stock_pct < 70.
+        gs_refill_report-priority = 'MEDIUM'.
+        gs_refill_report-line_color = 'C510'.  " Blue
+      ELSE.
+        gs_refill_report-priority = 'LOW'.
+        gs_refill_report-line_color = 'C510'.  " Green
+      ENDIF.
+
+      APPEND gs_refill_report TO gt_refill_report.
+
+    ENDLOOP.
+
+    " Sort by priority (URGENT first)
+    SORT gt_refill_report BY stock_pct ASCENDING.
+
+  ELSE.
+    MESSAGE 'No stock data found for refill report' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form BUILD_REFILL_FIELDCAT
+*&---------------------------------------------------------------------*
+* Build field catalog for refill report ALV
+*----------------------------------------------------------------------*
+FORM build_refill_fieldcat.
+
+  CLEAR: gt_refill_fieldcat.
+
+  " Priority
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'PRIORITY'.
+  gs_refill_fieldcat-scrtext_l = 'Priority'.
+  gs_refill_fieldcat-scrtext_m = 'Priority'.
+  gs_refill_fieldcat-scrtext_s = 'Priority'.
+  gs_refill_fieldcat-col_pos   = 1.
+  gs_refill_fieldcat-outputlen = 8.
+  gs_refill_fieldcat-emphasize = 'X'.
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Machine ID
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'MACHINE_ID'.
+  gs_refill_fieldcat-scrtext_l = 'Machine ID'.
+  gs_refill_fieldcat-scrtext_m = 'Machine ID'.
+  gs_refill_fieldcat-scrtext_s = 'Mach ID'.
+  gs_refill_fieldcat-col_pos   = 2.
+  gs_refill_fieldcat-outputlen = 10.
+  gs_refill_fieldcat-key       = 'X'.
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Location
+*  CLEAR gs_refill_fieldcat.
+*  gs_refill_fieldcat-fieldname = 'LOCATION'.
+*  gs_refill_fieldcat-scrtext_l = 'Location'.
+*  gs_refill_fieldcat-scrtext_m = 'Location'.
+*  gs_refill_fieldcat-scrtext_s = 'Location'.
+*  gs_refill_fieldcat-col_pos   = 3.
+*  gs_refill_fieldcat-outputlen = 25.
+*  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+*
+*  " Building Code
+*  CLEAR gs_refill_fieldcat.
+*  gs_refill_fieldcat-fieldname = 'BUILDING_CODE'.
+*  gs_refill_fieldcat-scrtext_l = 'Building'.
+*  gs_refill_fieldcat-scrtext_m = 'Building'.
+*  gs_refill_fieldcat-scrtext_s = 'Building'.
+*  gs_refill_fieldcat-col_pos   = 4.
+*  gs_refill_fieldcat-outputlen = 10.
+*  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Product ID
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'PRODUCT_ID'.
+  gs_refill_fieldcat-scrtext_l = 'Product ID'.
+  gs_refill_fieldcat-scrtext_m = 'Product ID'.
+  gs_refill_fieldcat-scrtext_s = 'Prod ID'.
+  gs_refill_fieldcat-col_pos   = 5.
+  gs_refill_fieldcat-outputlen = 10.
+  gs_refill_fieldcat-key       = 'X'.
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Product Name
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'PRODUCT_NAME'.
+  gs_refill_fieldcat-scrtext_l = 'Product Name'.
+  gs_refill_fieldcat-scrtext_m = 'Product Name'.
+  gs_refill_fieldcat-scrtext_s = 'Product'.
+  gs_refill_fieldcat-col_pos   = 6.
+  gs_refill_fieldcat-outputlen = 25.
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Current Quantity
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'CURRENT_QTY'.
+  gs_refill_fieldcat-scrtext_l = 'Current Qty'.
+  gs_refill_fieldcat-scrtext_m = 'Current Qty'.
+  gs_refill_fieldcat-scrtext_s = 'Curr Qty'.
+  gs_refill_fieldcat-col_pos   = 7.
+  gs_refill_fieldcat-outputlen = 10.
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Max Capacity
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'MAX_CAPACITY'.
+  gs_refill_fieldcat-scrtext_l = 'Max Capacity'.
+  gs_refill_fieldcat-scrtext_m = 'Max Cap'.
+  gs_refill_fieldcat-scrtext_s = 'Max'.
+  gs_refill_fieldcat-col_pos   = 8.
+  gs_refill_fieldcat-outputlen = 10.
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Required Quantity (IMPORTANT!)
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'REQUIRED_QTY'.
+  gs_refill_fieldcat-scrtext_l = 'Required Qty'.
+  gs_refill_fieldcat-scrtext_m = 'Required Qty'.
+  gs_refill_fieldcat-scrtext_s = 'Req Qty'.
+  gs_refill_fieldcat-col_pos   = 9.
+  gs_refill_fieldcat-outputlen = 10.
+  gs_refill_fieldcat-emphasize = 'C300'.  " Highlight
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+  " Stock Percentage
+  CLEAR gs_refill_fieldcat.
+  gs_refill_fieldcat-fieldname = 'STOCK_PCT'.
+  gs_refill_fieldcat-scrtext_l = 'Stock %'.
+  gs_refill_fieldcat-scrtext_m = 'Stock %'.
+  gs_refill_fieldcat-scrtext_s = 'Stock %'.
+  gs_refill_fieldcat-col_pos   = 10.
+  gs_refill_fieldcat-outputlen = 8.
+  APPEND gs_refill_fieldcat TO gt_refill_fieldcat.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form SET_REFILL_LAYOUT
+*&---------------------------------------------------------------------*
+* Set ALV layout options for refill report
+*----------------------------------------------------------------------*
+FORM set_refill_layout.
+
+  CLEAR gs_refill_layout.
+
+  gs_refill_layout-zebra      = 'X'.        " Alternating row colors
+  gs_refill_layout-cwidth_opt = 'X'.        " Optimize column width
+  gs_refill_layout-sel_mode   = 'A'.        " Row selection mode
+  gs_refill_layout-grid_title = 'Refill Requirements Report'. " Title
+  gs_refill_layout-info_fname = 'LINE_COLOR'. " For row coloring
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form REFRESH_REFILL_REPORT
+*&---------------------------------------------------------------------*
+* Refresh refill report data
+*----------------------------------------------------------------------*
+FORM refresh_refill_report.
+
+  " Get fresh data
+  PERFORM get_refill_report_data.
+
+  " Refresh ALV display
+  IF go_refill_grid IS NOT INITIAL.
+
+    DATA: ls_stable TYPE lvc_s_stbl.
+    ls_stable-row = 'X'.
+    ls_stable-col = 'X'.
+
+    CALL METHOD go_refill_grid->refresh_table_display
+      EXPORTING
+        is_stable = ls_stable
+      EXCEPTIONS
+        OTHERS    = 1.
+
+    IF sy-subrc = 0.
+      MESSAGE 'Refill report refreshed' TYPE 'S'.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form FREE_REFILL_ALV_OBJECTS
+*&---------------------------------------------------------------------*
+* Free refill ALV objects before leaving screen
+*----------------------------------------------------------------------*
+FORM free_refill_alv_objects.
+
+  IF go_refill_grid IS NOT INITIAL.
+    CALL METHOD go_refill_grid->free
+      EXCEPTIONS
+        OTHERS = 1.
+    FREE go_refill_grid.
+  ENDIF.
+
+  IF go_refill_container IS NOT INITIAL.
+    CALL METHOD go_refill_container->free
+      EXCEPTIONS
+        OTHERS = 1.
+    FREE go_refill_container.
+  ENDIF.
+
+ENDFORM.
+
+
+*&---------------------------------------------------------------------*
+*& ADD TO Z129_PROJECT_PROGRAM_F01 - FORM Routines
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*& Form LOG_STUDENT_USAGE
+*&---------------------------------------------------------------------*
+* Main routine to log usage and update stock
+*----------------------------------------------------------------------*
+FORM log_student_usage.
+
+  DATA: ls_usage_log    TYPE z129_usage_log,
+        lv_new_usage_id TYPE z129_usage_log-usage_id,
+        lv_stock_exists TYPE c LENGTH 1.
+
+  " Validation 1: Check required fields
+  IF gv_usage_student_id IS INITIAL.
+    MESSAGE 'Please enter Student ID' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  IF gv_usage_machine_id IS INITIAL.
+    MESSAGE 'Please enter Machine ID' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  IF gv_usage_product_id IS INITIAL.
+    MESSAGE 'Please enter Product ID' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  IF gv_usage_qty IS INITIAL OR gv_usage_qty <= 0.
+    MESSAGE 'Quantity must be greater than zero' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Validation 2: Check if student exists
+  SELECT SINGLE @abap_true
+    FROM z129_student
+    INTO @DATA(lv_exists)
+    WHERE student_id = @gv_usage_student_id.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Student ID does not exist' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Validation 3: Check if machine exists
+  SELECT SINGLE @abap_true
+    FROM z129_machine
+    INTO @lv_exists
+    WHERE machine_id = @gv_usage_machine_id.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Machine ID does not exist' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Validation 4: Check if product exists
+  SELECT SINGLE @abap_true
+    FROM z129_vend_prod
+    INTO @lv_exists
+    WHERE product_id = @gv_usage_product_id.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Product ID does not exist' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Validation 5: Check stock availability
+  SELECT SINGLE current_qty
+    FROM z129_stock
+    INTO @DATA(lv_current_stock)
+    WHERE machine_id = @gv_usage_machine_id
+      AND product_id = @gv_usage_product_id.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'No stock record found for this machine-product combination' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  IF lv_current_stock < gv_usage_qty.
+    DATA(lv_msg) = |Insufficient stock. Available: { lv_current_stock }|.
+    MESSAGE lv_msg TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Generate new USAGE_ID
+  PERFORM generate_usage_id CHANGING lv_new_usage_id.
+
+  " Prepare usage log record
+  ls_usage_log-usage_id       = lv_new_usage_id.
+  ls_usage_log-student_id     = gv_usage_student_id.
+  ls_usage_log-machine_id     = gv_usage_machine_id.
+  ls_usage_log-product_id     = gv_usage_product_id.
+  ls_usage_log-qty_taken      = gv_usage_qty.
+  ls_usage_log-usage_datetime = sy-datum.  " Current date
+
+  " Insert usage log
+  INSERT z129_usage_log FROM ls_usage_log.
+
+
+
+  IF sy-subrc = 0.
+    DATA lv_new_qty TYPE p DECIMALS 0.
+    lv_new_qty = lv_current_stock - gv_usage_qty.
+
+    UPDATE z129_stock
+      SET current_qty = @lv_new_qty
+      WHERE machine_id = @gv_usage_machine_id
+        AND product_id = @gv_usage_product_id.
+    " Update stock (reduce quantity)
+*    UPDATE z129_stock
+*      SET current_qty = current_qty - @gv_usage_qty
+*      WHERE machine_id = @gv_usage_machine_id
+*        AND product_id = @gv_usage_product_id.
+
+    IF sy-subrc = 0.
+      COMMIT WORK.
+      gv_usage_message = |Usage logged successfully. Stock updated. Usage ID: { lv_new_usage_id }|.
+      MESSAGE gv_usage_message TYPE 'S'.
+
+      " Clear fields for next entry
+      PERFORM clear_usage_fields.
+
+    ELSE.
+      ROLLBACK WORK.
+      MESSAGE 'Error updating stock' TYPE 'E'.
+    ENDIF.
+
+  ELSE.
+    ROLLBACK WORK.
+    MESSAGE 'Error logging usage' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form GENERATE_USAGE_ID
+*&---------------------------------------------------------------------*
+* Auto-generate next sequential usage ID
+*----------------------------------------------------------------------*
+FORM generate_usage_id CHANGING cv_usage_id TYPE z129_usage_log-usage_id.
+
+  DATA: lv_max_id   TYPE z129_usage_log-usage_id,
+        lv_num_part TYPE n LENGTH 6,
+        lv_next_num TYPE i.
+
+  " Get highest existing USAGE_ID
+  SELECT MAX( usage_id )
+    FROM z129_usage_log
+    INTO @lv_max_id.
+
+  IF sy-subrc = 0 AND lv_max_id IS NOT INITIAL.
+    " Extract numeric part (e.g., "USG000001" -> "000001")
+    lv_num_part = lv_max_id+3(6).
+    lv_next_num = lv_num_part + 1.
+  ELSE.
+    " First usage log
+    lv_next_num = 1.
+  ENDIF.
+
+  " Format new ID: USG000001, USG000002, etc.
+  cv_usage_id = |USG{ lv_next_num WIDTH = 6 ALIGN = RIGHT PAD = '0' }|.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form FETCH_STUDENT_INFO
+*&---------------------------------------------------------------------*
+* Auto-fill student name when Student ID is entered
+*----------------------------------------------------------------------*
+FORM fetch_student_info.
+
+  CLEAR: gv_student_name.
+
+  IF gv_usage_student_id IS NOT INITIAL.
+
+    SELECT SINGLE student_name
+      FROM z129_student
+      INTO @gv_student_name
+      WHERE student_id = @gv_usage_student_id.
+
+    IF sy-subrc <> 0.
+      gv_student_name = '(Student not found)'.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form FETCH_MACHINE_INFO
+*&---------------------------------------------------------------------*
+* Auto-fill machine location when Machine ID is entered
+*----------------------------------------------------------------------*
+FORM fetch_machine_info.
+
+  CLEAR: gv_machine_location.
+
+  IF gv_usage_machine_id IS NOT INITIAL.
+
+    SELECT SINGLE building_name
+      FROM z129_machine
+      INTO @gv_machine_location
+      WHERE machine_id = @gv_usage_machine_id.
+
+    IF sy-subrc <> 0.
+      gv_machine_location = '(Machine not found)'.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form FETCH_PRODUCT_INFO
+*&---------------------------------------------------------------------*
+* Auto-fill product details and available stock
+*----------------------------------------------------------------------*
+FORM fetch_product_info.
+
+  CLEAR: gv_product_name, gv_available_stock, gv_product_price.
+
+  IF gv_usage_product_id IS NOT INITIAL.
+
+    " Get product details
+    SELECT SINGLE product_name, price
+      FROM z129_vend_prod
+      INTO (@gv_product_name, @gv_product_price)
+      WHERE product_id = @gv_usage_product_id.
+
+    IF sy-subrc = 0.
+      " Product found
+*      MESSAGE |Product: { gv_product_name }, Price: { gv_product_price }| TYPE 'I'.
+
+      " Get available stock for this machine-product combination
+      IF gv_usage_machine_id IS NOT INITIAL.
+        SELECT SINGLE current_qty
+          FROM z129_stock
+          INTO @gv_available_stock
+          WHERE machine_id = @gv_usage_machine_id
+            AND product_id = @gv_usage_product_id.
+
+        IF sy-subrc = 0.
+*          MESSAGE |Stock found: { gv_available_stock } units| TYPE 'I'.
+        ELSE.
+          gv_available_stock = 0.
+          MESSAGE 'No stock record found for this combination' TYPE 'I'.
+        ENDIF.
+      ELSE.
+        gv_available_stock = 0.
+        MESSAGE 'Please select Machine ID first' TYPE 'I'.
+      ENDIF.
+
+    ELSE.
+      gv_product_name = '(Product not found)'.
+      gv_product_price = 0.
+      gv_available_stock = 0.
+      MESSAGE 'Product ID not found in database' TYPE 'E'.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form CLEAR_USAGE_FIELDS
+*&---------------------------------------------------------------------*
+* Clear all input and display fields
+*----------------------------------------------------------------------*
+FORM clear_usage_fields.
+
+  " Clear all input fields
+  CLEAR: gv_usage_student_id,
+         gv_usage_machine_id,
+         gv_usage_product_id,
+         gv_usage_qty.
+
+  " Clear all display fields
+  CLEAR: gv_student_name,
+         gv_machine_location,
+         gv_product_name,
+         gv_available_stock,
+         gv_product_price.
+
+  " Reset default quantity
+  gv_usage_qty = 1.
+
+*  MESSAGE 'Fields cleared' TYPE 'S'.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form F4_HELP_STUDENT_USAGE
+*&---------------------------------------------------------------------*
+* F4 help for Student ID selection
+*----------------------------------------------------------------------*
+FORM f4_help_student_usage.
+
+  DATA: lt_return TYPE TABLE OF ddshretval.
+
+  " Get all active students
+  SELECT student_id, student_name
+*    department
+    FROM z129_student
+    INTO TABLE @DATA(lt_students).
+*    WHERE status = 'Active'.
+
+  IF sy-subrc = 0.
+
+    CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+      EXPORTING
+        retfield        = 'STUDENT_ID'
+        dynpprog        = sy-repid
+        dynpnr          = sy-dynnr
+        dynprofield     = 'GV_USAGE_STUDENT_ID'
+        value_org       = 'S'
+      TABLES
+        value_tab       = lt_students
+        return_tab      = lt_return
+      EXCEPTIONS
+        parameter_error = 1
+        no_values_found = 2
+        OTHERS          = 3.
+
+    " Auto-fill student name after selection
+    IF sy-subrc = 0.
+      PERFORM fetch_student_info.
+    ENDIF.
+
+  ELSE.
+    MESSAGE 'No active students found' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form F4_HELP_MACHINE_USAGE
+*&---------------------------------------------------------------------*
+* F4 help for Machine ID selection
+*----------------------------------------------------------------------*
+FORM f4_help_machine_usage.
+
+  DATA: lt_return TYPE TABLE OF ddshretval.
+
+  " Get all active machines
+  SELECT machine_id
+*    location,
+*    building_code
+    FROM z129_machine
+    INTO TABLE @DATA(lt_machines).
+*    WHERE status = 'Active'.
+
+  IF sy-subrc = 0.
+
+    CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+      EXPORTING
+        retfield        = 'MACHINE_ID'
+        dynpprog        = sy-repid
+        dynpnr          = sy-dynnr
+        dynprofield     = 'GV_USAGE_MACHINE_ID'
+        value_org       = 'S'
+      TABLES
+        value_tab       = lt_machines
+        return_tab      = lt_return
+      EXCEPTIONS
+        parameter_error = 1
+        no_values_found = 2
+        OTHERS          = 3.
+
+    " Auto-fill machine location after selection
+    IF sy-subrc = 0.
+      PERFORM fetch_machine_info.
+      " Also refresh product stock if product is already selected
+      IF gv_usage_product_id IS NOT INITIAL.
+        PERFORM fetch_product_info.
+      ENDIF.
+    ENDIF.
+
+  ELSE.
+    MESSAGE 'No active machines found' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form F4_HELP_PRODUCT_USAGE
+*&---------------------------------------------------------------------*
+* F4 help for Product ID selection
+*----------------------------------------------------------------------*
+FORM f4_help_product_usage.
+
+  DATA: lt_return TYPE TABLE OF ddshretval.
+
+  " Get all products
+  SELECT product_id, product_name,
+*    category,
+    price
+    FROM z129_vend_prod
+    INTO TABLE @DATA(lt_products).
+
+  IF sy-subrc = 0.
+
+    CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+      EXPORTING
+        retfield        = 'PRODUCT_ID'
+        dynpprog        = sy-repid
+        dynpnr          = sy-dynnr
+        dynprofield     = 'GV_USAGE_PRODUCT_ID'
+        value_org       = 'S'
+      TABLES
+        value_tab       = lt_products
+        return_tab      = lt_return
+      EXCEPTIONS
+        parameter_error = 1
+        no_values_found = 2
+        OTHERS          = 3.
+
+    " Auto-fill product details and stock after selection
+    IF sy-subrc = 0.
+      PERFORM fetch_product_info.
+    ENDIF.
+
+  ELSE.
+    MESSAGE 'No products found' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& END OF LOG STUDENT USAGE CODE
+*&---------------------------------------------------------------------*
+
+
+*&---------------------------------------------------------------------*
+*& ADD TO Z129_PROJECT_PROGRAM_F01 - FORM Routines
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*& Form DISPLAY_MACHINE_STOCK_OVERVIEW
+*&---------------------------------------------------------------------*
+* Display ALV with all products in selected machine
+*----------------------------------------------------------------------*
+FORM display_machine_stock_overview.
+
+  " Validate machine ID is entered
+  IF gv_overview_machine_id IS INITIAL.
+    MESSAGE 'Please enter Machine ID' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Validate machine exists
+  SELECT SINGLE @abap_true
+    FROM z129_machine
+    INTO @DATA(lv_exists)
+    WHERE machine_id = @gv_overview_machine_id.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Machine ID does not exist' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Get machine stock data
+  PERFORM get_machine_stock_data.
+
+  " Create container if not exists
+  IF go_overview_container IS INITIAL.
+    CREATE OBJECT go_overview_container
+      EXPORTING
+        container_name = 'OVERVIEW_CONTAINER'
+      EXCEPTIONS
+        OTHERS         = 1.
+
+    IF sy-subrc <> 0.
+      MESSAGE 'Error creating overview container' TYPE 'E'.
+      RETURN.
+    ENDIF.
+  ENDIF.
+
+  " Create ALV Grid if not exists
+  IF go_overview_grid IS INITIAL.
+    CREATE OBJECT go_overview_grid
+      EXPORTING
+        i_parent = go_overview_container
+      EXCEPTIONS
+        OTHERS   = 1.
+
+    IF sy-subrc <> 0.
+      MESSAGE 'Error creating overview ALV Grid' TYPE 'E'.
+      RETURN.
+    ENDIF.
+  ENDIF.
+
+  " Build field catalog
+  PERFORM build_overview_fieldcat.
+
+  " Set layout
+  PERFORM set_overview_layout.
+
+  " Display ALV
+  CALL METHOD go_overview_grid->set_table_for_first_display
+    EXPORTING
+      is_layout       = gs_overview_layout
+    CHANGING
+      it_outtab       = gt_machine_stock
+      it_fieldcatalog = gt_overview_fieldcat
+    EXCEPTIONS
+      OTHERS          = 1.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error displaying overview ALV' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form GET_MACHINE_STOCK_DATA
+*&---------------------------------------------------------------------*
+* Fetch all products in the selected machine
+*----------------------------------------------------------------------*
+FORM get_machine_stock_data.
+
+  CLEAR: gt_machine_stock.
+
+  " Get all products in this machine with stock info
+  SELECT s~product_id,
+         p~product_name,
+*         p~category,
+         s~current_qty,
+         p~max_capacity,
+         p~price
+    FROM z129_stock AS s
+    INNER JOIN z129_vend_prod AS p
+      ON s~product_id = p~product_id
+    INTO TABLE @DATA(lt_data)
+    WHERE s~machine_id = @gv_overview_machine_id.
+
+  IF sy-subrc = 0.
+
+    " Process each product
+    LOOP AT lt_data INTO DATA(ls_data).
+
+      CLEAR gs_machine_stock.
+
+      gs_machine_stock-product_id   = ls_data-product_id.
+      gs_machine_stock-product_name = ls_data-product_name.
+*      gs_machine_stock-category     = ls_data-category.
+      gs_machine_stock-current_qty  = ls_data-current_qty.
+      gs_machine_stock-max_capacity = ls_data-max_capacity.
+      gs_machine_stock-price        = ls_data-price.
+
+      " Calculate stock percentage
+      IF ls_data-max_capacity > 0.
+        gs_machine_stock-stock_pct =
+          ( ls_data-current_qty / ls_data-max_capacity ) * 100.
+      ELSE.
+        gs_machine_stock-stock_pct = 0.
+      ENDIF.
+
+      " Determine status
+      IF gs_machine_stock-current_qty = 0.
+        gs_machine_stock-status = 'OUT'.
+      ELSEIF gs_machine_stock-stock_pct < 30.
+        gs_machine_stock-status = 'LOW'.
+      ELSEIF gs_machine_stock-stock_pct < 70.
+        gs_machine_stock-status = 'MEDIUM'.
+      ELSE.
+        gs_machine_stock-status = 'GOOD'.
+      ENDIF.
+
+      APPEND gs_machine_stock TO gt_machine_stock.
+
+    ENDLOOP.
+
+    " Sort by stock percentage (lowest first)
+    SORT gt_machine_stock BY stock_pct ASCENDING.
+
+  ELSE.
+    MESSAGE 'No products found for this machine' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form BUILD_OVERVIEW_FIELDCAT
+*&---------------------------------------------------------------------*
+* Build field catalog for machine stock overview
+*----------------------------------------------------------------------*
+FORM build_overview_fieldcat.
+
+  CLEAR: gt_overview_fieldcat.
+
+  " Status
+  CLEAR gs_overview_fieldcat.
+  gs_overview_fieldcat-fieldname = 'STATUS'.
+  gs_overview_fieldcat-scrtext_l = 'Status'.
+  gs_overview_fieldcat-scrtext_m = 'Status'.
+  gs_overview_fieldcat-scrtext_s = 'Status'.
+  gs_overview_fieldcat-col_pos   = 1.
+  gs_overview_fieldcat-outputlen = 8.
+  gs_overview_fieldcat-emphasize = 'C500'.
+  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+  " Product ID
+  CLEAR gs_overview_fieldcat.
+  gs_overview_fieldcat-fieldname = 'PRODUCT_ID'.
+  gs_overview_fieldcat-scrtext_l = 'Product ID'.
+  gs_overview_fieldcat-scrtext_m = 'Product ID'.
+  gs_overview_fieldcat-scrtext_s = 'Prod ID'.
+  gs_overview_fieldcat-col_pos   = 2.
+  gs_overview_fieldcat-outputlen = 10.
+  gs_overview_fieldcat-key       = 'X'.
+  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+  " Product Name
+  CLEAR gs_overview_fieldcat.
+  gs_overview_fieldcat-fieldname = 'PRODUCT_NAME'.
+  gs_overview_fieldcat-scrtext_l = 'Product Name'.
+  gs_overview_fieldcat-scrtext_m = 'Product Name'.
+  gs_overview_fieldcat-scrtext_s = 'Product'.
+  gs_overview_fieldcat-col_pos   = 3.
+  gs_overview_fieldcat-outputlen = 30.
+  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+  " Category
+*  CLEAR gs_overview_fieldcat.
+*  gs_overview_fieldcat-fieldname = 'CATEGORY'.
+*  gs_overview_fieldcat-scrtext_l = 'Category'.
+*  gs_overview_fieldcat-scrtext_m = 'Category'.
+*  gs_overview_fieldcat-scrtext_s = 'Category'.
+*  gs_overview_fieldcat-col_pos   = 4.
+*  gs_overview_fieldcat-outputlen = 15.
+*  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+  " Current Quantity
+  CLEAR gs_overview_fieldcat.
+  gs_overview_fieldcat-fieldname = 'CURRENT_QTY'.
+  gs_overview_fieldcat-scrtext_l = 'Current Qty'.
+  gs_overview_fieldcat-scrtext_m = 'Current Qty'.
+  gs_overview_fieldcat-scrtext_s = 'Curr Qty'.
+  gs_overview_fieldcat-col_pos   = 5.
+  gs_overview_fieldcat-outputlen = 10.
+  gs_overview_fieldcat-emphasize = 'C300'.
+  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+  " Max Capacity
+  CLEAR gs_overview_fieldcat.
+  gs_overview_fieldcat-fieldname = 'MAX_CAPACITY'.
+  gs_overview_fieldcat-scrtext_l = 'Max Capacity'.
+  gs_overview_fieldcat-scrtext_m = 'Max Cap'.
+  gs_overview_fieldcat-scrtext_s = 'Max'.
+  gs_overview_fieldcat-col_pos   = 6.
+  gs_overview_fieldcat-outputlen = 10.
+  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+  " Stock Percentage
+  CLEAR gs_overview_fieldcat.
+  gs_overview_fieldcat-fieldname = 'STOCK_PCT'.
+  gs_overview_fieldcat-scrtext_l = 'Stock %'.
+  gs_overview_fieldcat-scrtext_m = 'Stock %'.
+  gs_overview_fieldcat-scrtext_s = 'Stock %'.
+  gs_overview_fieldcat-col_pos   = 7.
+  gs_overview_fieldcat-outputlen = 8.
+  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+  " Price
+  CLEAR gs_overview_fieldcat.
+  gs_overview_fieldcat-fieldname = 'PRICE'.
+  gs_overview_fieldcat-scrtext_l = 'Price'.
+  gs_overview_fieldcat-scrtext_m = 'Price'.
+  gs_overview_fieldcat-scrtext_s = 'Price'.
+  gs_overview_fieldcat-col_pos   = 8.
+  gs_overview_fieldcat-outputlen = 12.
+  APPEND gs_overview_fieldcat TO gt_overview_fieldcat.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form SET_OVERVIEW_LAYOUT
+*&---------------------------------------------------------------------*
+* Set ALV layout for machine stock overview
+*----------------------------------------------------------------------*
+FORM set_overview_layout.
+
+  CLEAR gs_overview_layout.
+
+  gs_overview_layout-zebra      = 'X'.
+  gs_overview_layout-cwidth_opt = 'X'.
+  gs_overview_layout-sel_mode   = 'A'.
+
+  " Dynamic title with machine ID and location
+  DATA(lv_title) = |Machine { gv_overview_machine_id } - { gv_overview_location } - Stock Overview|.
+  gs_overview_layout-grid_title = lv_title.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form REFRESH_MACHINE_STOCK_OVERVIEW
+*&---------------------------------------------------------------------*
+* Refresh machine stock data
+*----------------------------------------------------------------------*
+FORM refresh_machine_stock_overview.
+
+  IF gv_overview_machine_id IS INITIAL.
+    MESSAGE 'Please enter Machine ID first' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " Get fresh data
+  PERFORM get_machine_stock_data.
+
+  " Refresh ALV display
+  IF go_overview_grid IS NOT INITIAL.
+
+    DATA: ls_stable TYPE lvc_s_stbl.
+    ls_stable-row = 'X'.
+    ls_stable-col = 'X'.
+
+    CALL METHOD go_overview_grid->refresh_table_display
+      EXPORTING
+        is_stable = ls_stable
+      EXCEPTIONS
+        OTHERS    = 1.
+
+    IF sy-subrc = 0.
+      MESSAGE 'Stock overview refreshed' TYPE 'S'.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form FETCH_OVERVIEW_MACHINE_INFO
+*&---------------------------------------------------------------------*
+* Auto-fill machine location for overview screen
+*----------------------------------------------------------------------*
+FORM fetch_overview_machine_info.
+
+  CLEAR: gv_overview_location.
+
+  IF gv_overview_machine_id IS NOT INITIAL.
+
+    SELECT SINGLE building_name
+      FROM z129_machine
+      INTO @gv_overview_location
+      WHERE machine_id = @gv_overview_machine_id.
+
+    IF sy-subrc <> 0.
+      gv_overview_location = '(Machine not found)'.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form F4_HELP_OVERVIEW_MACHINE
+*&---------------------------------------------------------------------*
+* F4 help for machine selection on overview screen
+*----------------------------------------------------------------------*
+FORM f4_help_overview_machine.
+
+  DATA: lt_return TYPE TABLE OF ddshretval.
+
+  " Get all active machines
+  SELECT machine_id, building_name
+    FROM z129_machine
+    INTO TABLE @DATA(lt_machines).
+
+  IF sy-subrc = 0.
+
+    CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+      EXPORTING
+        retfield        = 'MACHINE_ID'
+        dynpprog        = sy-repid
+        dynpnr          = sy-dynnr
+        dynprofield     = 'GV_OVERVIEW_MACHINE_ID'
+        value_org       = 'S'
+      TABLES
+        value_tab       = lt_machines
+        return_tab      = lt_return
+      EXCEPTIONS
+        parameter_error = 1
+        no_values_found = 2
+        OTHERS          = 3.
+
+    " Auto-fill location after selection
+    IF sy-subrc = 0.
+      PERFORM fetch_overview_machine_info.
+    ENDIF.
+
+  ELSE.
+    MESSAGE 'No machines found' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form CLEAR_OVERVIEW_SCREEN
+*&---------------------------------------------------------------------*
+* Clear machine ID and reset screen
+*----------------------------------------------------------------------*
+FORM clear_overview_screen.
+
+  CLEAR: gv_overview_machine_id, gv_overview_location, gt_machine_stock.
+
+  " Free and clear ALV
+  PERFORM free_overview_alv_objects.
+
+  MESSAGE 'Screen cleared' TYPE 'S'.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form FREE_OVERVIEW_ALV_OBJECTS
+*&---------------------------------------------------------------------*
+* Free ALV objects for overview screen
+*----------------------------------------------------------------------*
+FORM free_overview_alv_objects.
+
+  IF go_overview_grid IS NOT INITIAL.
+    CALL METHOD go_overview_grid->free
+      EXCEPTIONS
+        OTHERS = 1.
+    FREE go_overview_grid.
+  ENDIF.
+
+  IF go_overview_container IS NOT INITIAL.
+    CALL METHOD go_overview_container->free
+      EXCEPTIONS
+        OTHERS = 1.
+    FREE go_overview_container.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& SCREEN 0170 LAYOUT
+*&---------------------------------------------------------------------*

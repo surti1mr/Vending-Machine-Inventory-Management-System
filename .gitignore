@@ -1,0 +1,33 @@
+# ABAP Development
+*.abap.bak
+*.abap~
+*.log
+*.lst
+*.tmp
+
+# SAP-specific
+*.sap
+*.transport
+*.tp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build artifacts
+*.o
+*.so
+*.dll
+
+# Temporary files
+*.tmp
+*.temp
+

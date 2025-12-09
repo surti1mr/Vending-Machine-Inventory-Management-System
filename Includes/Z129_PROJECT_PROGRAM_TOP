@@ -1,0 +1,131 @@
+*&---------------------------------------------------------------------*
+*& Include Z129_PROJECT_PROGRAM_TOP
+*& Global Data Declarations
+*& Module Pool: Z129_PROJECT_PROGRAM
+*&---------------------------------------------------------------------*
+
+PROGRAM z129_project_program.
+
+DATA: gv_machine_id  TYPE z129_stock-machine_id,
+      gv_product_id  TYPE z129_stock-product_id,
+      gv_qty         TYPE z129_stock-current_qty,
+      gv_error_flag  TYPE c LENGTH 1.
+
+*&---------------------------------------------------------------------*
+*& Basic Data
+*&---------------------------------------------------------------------*
+DATA: ok_code TYPE sy-ucomm.
+
+*&---------------------------------------------------------------------*
+*& ALV Grid Objects
+*&---------------------------------------------------------------------*
+DATA: go_container TYPE REF TO cl_gui_custom_container,
+      go_alv_grid  TYPE REF TO cl_gui_alv_grid.
+
+*&---------------------------------------------------------------------*
+*& Stock Display Structure and Internal Table
+*&---------------------------------------------------------------------*
+TYPES: BEGIN OF ty_stock_display,
+         machine_id   TYPE z129_stock-machine_id,
+         product_id   TYPE z129_stock-product_id,
+         current_qty  TYPE z129_stock-current_qty,
+         location     TYPE z129_machine-BUILDING_NAME,
+         product_name TYPE z129_vend_prod-product_name,
+         max_capacity TYPE z129_vend_prod-max_capacity,
+         stock_pct    TYPE p DECIMALS 2,
+       END OF ty_stock_display.
+
+DATA: gt_stock_display TYPE TABLE OF ty_stock_display,
+      gs_stock_display TYPE ty_stock_display.
+
+*&---------------------------------------------------------------------*
+*& ALV Field Catalog and Layout
+*&---------------------------------------------------------------------*
+DATA: gt_fieldcat TYPE lvc_t_fcat,
+      gs_fieldcat TYPE lvc_s_fcat,
+      gs_layout   TYPE lvc_s_layo.
+
+*&---------------------------------------------------------------------*
+*& END OF GLOBAL DATA DECLARATIONS
+*&---------------------------------------------------------------------*
+
+
+* Add to existing declarations:
+
+* Refill report data structure
+TYPES: BEGIN OF ty_refill_report,
+         machine_id    TYPE z129_stock-machine_id,
+         location      TYPE z129_machine-BUILDING_NAME,
+*         building_code TYPE z129_machine-building_code,
+         product_id    TYPE z129_stock-product_id,
+         product_name  TYPE z129_vend_prod-product_name,
+         current_qty   TYPE z129_stock-current_qty,
+         max_capacity  TYPE z129_vend_prod-max_capacity,
+         required_qty  TYPE i,
+         stock_pct     TYPE p DECIMALS 2,
+         priority      TYPE char10,
+         line_color    TYPE char4,
+       END OF ty_refill_report.
+
+DATA: gt_refill_report TYPE TABLE OF ty_refill_report,
+      gs_refill_report TYPE ty_refill_report.
+
+* ALV objects for refill report
+DATA: go_refill_container TYPE REF TO cl_gui_custom_container,
+      go_refill_grid      TYPE REF TO cl_gui_alv_grid.
+
+DATA: gt_refill_fieldcat TYPE lvc_t_fcat,
+      gs_refill_fieldcat TYPE lvc_s_fcat,
+      gs_refill_layout   TYPE lvc_s_layo.
+
+
+
+*&---------------------------------------------------------------------*
+*& UPDATE Z129_PROJECT_PROGRAM_TOP - Add these declarations
+*&---------------------------------------------------------------------*
+
+* Add to existing declarations:
+
+* Usage logging variables
+DATA: gv_usage_student_id   TYPE z129_usage_log-student_id,
+      gv_usage_machine_id   TYPE z129_usage_log-machine_id,
+      gv_usage_product_id   TYPE z129_usage_log-product_id,
+      gv_usage_qty          TYPE z129_usage_log-qty_taken,
+      gv_usage_datetime     TYPE z129_usage_log-usage_datetime.
+
+* Display fields (auto-filled)
+DATA: gv_student_name       TYPE z129_student-student_name,
+      gv_machine_location   TYPE z129_machine-BUILDING_NAME,
+      gv_product_name       TYPE z129_vend_prod-product_name,
+      gv_available_stock    TYPE z129_stock-current_qty,
+      gv_product_price      TYPE z129_vend_prod-price.
+
+* Message handling
+DATA: gv_usage_message      TYPE string.
+
+* Machine stock overview variables
+DATA: gv_overview_machine_id TYPE z129_machine-machine_id,
+      gv_overview_location   TYPE z129_machine-building_name.
+
+* Stock overview data structure
+TYPES: BEGIN OF ty_machine_stock,
+         product_id    TYPE z129_stock-product_id,
+         product_name  TYPE z129_vend_prod-product_name,
+*         category      TYPE z129_vend_prod-category,
+         current_qty   TYPE z129_stock-current_qty,
+         max_capacity  TYPE z129_vend_prod-max_capacity,
+         stock_pct     TYPE p DECIMALS 2,
+         price         TYPE z129_vend_prod-price,
+         status        TYPE char10,
+       END OF ty_machine_stock.
+
+DATA: gt_machine_stock TYPE TABLE OF ty_machine_stock,
+      gs_machine_stock TYPE ty_machine_stock.
+
+* ALV objects for machine stock overview
+DATA: go_overview_container TYPE REF TO cl_gui_custom_container,
+      go_overview_grid      TYPE REF TO cl_gui_alv_grid.
+
+DATA: gt_overview_fieldcat TYPE lvc_t_fcat,
+      gs_overview_fieldcat TYPE lvc_s_fcat,
+      gs_overview_layout   TYPE lvc_s_layo.
